@@ -2,6 +2,13 @@ import sys
 import socket
 import random
 import pickle
+import time
+from ActiveFlightDatabase import createFlightPlan
+from ActiveFlightDatabase import startUp
+from ActiveFlightDatabase import positionUpdate
+from ActiveFlightDatabase import printDict
+from ActiveFlightDatabase import clearDict
+ 
 
 class FlightServer():
     
@@ -11,15 +18,14 @@ class FlightServer():
         self.listenPort = port
         self.connections = 0
         self.numberOfFlights = 0
+        startUp()
         
     def stats( self ):
         return( self.connections, self.echoCount)
     
     ######################################
     def run( self ):
-        
-        flightRecords = dict()
-        
+          
         listenSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         print("Listen socket created for flight server.")
         
@@ -37,29 +43,33 @@ class FlightServer():
             clientSocket, clientAddress = listenSocket.accept()
             print( "Received connection from ", end='' )
             print( clientAddress )
-            self.connections += 1
-            clientConnected=True
-            while clientConnected and not dead :
-                flightCode = random.randint(1000,9999)
+            route = int(clientSocket.recv(4096).decode('ascii'))
+            if route == 1:
+                flightCode = int(time.time() * 10000)
                 print("Assigning flight code.")
                 clientSocket.sendall(str(flightCode).encode('ascii'))
                 print("Sent flight code.")
-                
                 chunkData = b''
-                while True:
-                    chunk = clientSocket.recv(4096)
-                    if not chunk:
-                        break
-                    chunkData += chunk
+                chunk = clientSocket.recv(8192)
+                chunkData += chunk
                 flightData = pickle.loads(chunkData)
-                print("Received flight data for flight #%s:" % flightCode)
-                print(flightData)
-                
-                
-                self.numberOfFlights += 1
-                dead = True
+                if flightData[1] == 'DIE':
+                    print("Received server kill code from client.")
+                    dead = True
+                    break
+                elif flightData[1] == 'EMT':
+                    print("Clearing active flight database.")
+                    clearDict()
+                else:
+                    print("Received flight data for flight #%s" % flightCode)
+                    createFlightPlan(flightData[0], flightData[1], flightData[2], flightData[3], flightData[4])
+                printDict()
+            elif route == 2:
+                # Code for route updates does here.
+                print('hi')
+            else:
+                print("Invalid client connection. Closing client connection")
             clientSocket.close()
-            
         listenSocket.close()
         print('Shutting echo server down')
 
