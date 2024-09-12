@@ -25,7 +25,17 @@ def createFlightPlan(code, src, dst, lata, lona):
 def positionUpdate(flightCode, coordinateIndex):
     # Lookup flight code in database.
     # Assuming flight code is found, update position
-    print("hi")
+    if flightCode in flightPlanDict:
+        latPath = flightPlanDict[3]
+        latPosition = latPath[coordinateIndex]
+        longPath = flightPlanDict[4]
+        longPosition = longPath[coordinateIndex]
+        position = [latPosition, longPosition]
+        return position
+    else:
+        return "DIE"
+        print("Flight code not found.")
+        
     
 def printDict():
     print(flightPlanDict)
