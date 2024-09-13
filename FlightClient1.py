@@ -79,26 +79,55 @@ try:
 except NameError as err:
     print("Element of flight plan is not defined.")
     sys.exit(0)
-
-
 print("Flight plan sent.")
 
-route = 2
+
+
+
 
 # Position update sequence
 
 i = 0
 
 for i in range(len(latPath)):
-        
-    clientSocket.sendall(str(route).encode('ascii'))
-    clientSocket.sendall(str(i).encode('ascii'))
-    clientSocket.sendall(str(rawCode).encode('ascii'))
+
+    try:   
+        clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        print("Trying to connect...")
+        clientSocket.connect((serverHost, serverPort))
+        print( 'Connection succeeded')
+        route = 1
+    except ConnectionRefusedError as Err:
+        print("Connection refused by server.")
+        sys.exit(0)
+    except TimeoutError as Err:
+        print("Timeout... Cannot find host server.")
+        sys.exit(0)
     
-    time.sleep(5)
-    if i == len(latPath):
-        print("Flight complete. Terminating client.")
+    route = 2
+    clientSocket.sendall(str(route).encode('ascii'))
+    ready = clientSocket.recv(4096)
+    print("Sending position update...")
+    
+    outboundData = [str(i), str(flightCode)]
+    
+    for i in range(2):
+        
+        clientSocket.sendall(outboundData[i].encode('ascii'))
+        clientSocket.recv(4096).decode('ascii')
+        
+    print("Sent updated data.")      
+    
+    latPosition = latPath[i]
+    
+    if latPosition == latPath[-1]:
+        finalMsg = "Flight complete. CLosing client socket."
+        print(finalMsg)
         clientSocket.close()
+
+    time.sleep(3)
+
+    
             
 
 

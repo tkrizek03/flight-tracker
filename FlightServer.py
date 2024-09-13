@@ -48,6 +48,7 @@ class FlightServer():
                 route = int(clientSocket.recv(4096).decode('ascii'))
                 if route == 1:
                     
+                    print("Received new connection.")
                     flightCode = int(time.time() * 10000)
                     print("Assigning flight code.")
                     clientSocket.sendall(str(flightCode).encode('ascii'))
@@ -60,32 +61,65 @@ class FlightServer():
                     
                     if flightData[1] == 'DIE':
                         print("Received server kill code from client. Shutting server and client down.")
+                        clientConnected = False
                         dead = True
                         break
                     elif flightData[1] == 'EMT':
                         print("Clearing active flight database. Shutting server and client down.")
                         clearDict()
+                        clientConnected = False
                         dead = True
                         break
                     else:
                         print("Received flight data for flight #%s" % flightCode)
                         createFlightPlan(flightData[0], flightData[1], flightData[2], flightData[3], flightData[4])
                         print("Flight plan created.")
+                        clientConnected = False
+                        clientSocket.close()
+                        break
                     
                 elif route == 2:
+                    print("Receiving position update...")
+                    clientSocket.sendall(("Ready").encode("ascii"))
                     
-                    positionNumber = int(clientSocket.recv(4096).decode('ascii'))
-                    connectedFlight = int(clientSocket.recv(4096).decode('ascii'))
-                    position = positionUpdate(connectedFlight, positionNumber)
-                    if position == "DIE":
-                        print("Invalid flight code entered. Terminating client connection.")
+                    for i in range(2):
+                        if i == 0:
+                            
+                            coordinateIndex = int(clientSocket.recv(4096).decode("ascii"))
+                            clientSocket.sendall(str(coordinateIndex).encode("ascii"))
+                            
+                        elif i == 1:
+                            
+                            receivedCode = int(clientSocket.recv(4096).decode("ascii"))
+                            clientSocket.sendall(str(coordinateIndex).encode("ascii"))
+                    
+                    position = positionUpdate(receivedCode, coordinateIndex)
+                    
+                    if position[0] == "DIE":
+                        
+                        print("Invalid flight code entered. Closing client.")
+                        clientSocket.close()
+                        clientConnected = False
                         break
-                    else:
-                        print(position)
                     
+                    elif position[2] == "END":
+                        
+                        print("Flight #{} is at [lat, lon]: {}, {}.".format(receivedCode, position[0], position[1]))
+                        print("Flight #%d has arrived. Closing client." % receivedCode)
+                        clientConnected = False
+                        break
+                    
+                    else:
+                        
+                        print("Flight #{} is at [lat, lon]: {}, {}.".format(receivedCode, position[0], position[1]))
+                        clientSocket.close()
+                        clientConnected = False
+                        break
                 else:
+                    
                     print("Invalid client connection. Closing client connection")
-                    dead == True;
+                    clientConnected = False
+                    dead == True
         
         clientSocket.close()
         listenSocket.close()
