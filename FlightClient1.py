@@ -6,17 +6,20 @@ import time
 from GlobalAirportDatabase import *
 from AirportRecord import *
 
+newFlightPlan = 1 
+newPositionUpdate = 2
+
 gdb = GlobalAirportDatabase()
 gdb.load("GlobalAirportDatabase.txt")
 
 if len(sys.argv) == 4:
     sourceAirport = sys.argv[1]
     endAirport = sys.argv[2]
-    flightTime = int(sys.argv[3])
+    numberPoints = int(sys.argv[3]) # Chnage to number of points. create a cap
 else:
     sourceAirport = input("Enter source airport code: ")
     endAirport = input("Enter arrival airport code: ")
-    flightTime = int(input("Enter flight time in seconds: "))
+    numberPoints = int(input("Enter number of points (position update every 10 seconds): ")) # change to above
 
 serverHost = "127.0.0.1"
 serverPort = 9000
@@ -35,11 +38,11 @@ except TimeoutError as Err:
     print("Timeout... Cannot find host server.")
     sys.exit(0)
     
-route = 1
+msgType = newFlightPlan
 
     # Receives flight code from server
 try:
-    clientSocket.sendall(str(route).encode('ascii'))
+    clientSocket.sendall(str(msgType).encode('ascii'))
     rawCode = clientSocket.recv(4096)
     flightCode = int(rawCode.decode('ascii'))
     print("Received flight code - %s" % flightCode )
@@ -48,24 +51,21 @@ except OSError as ConnectionReset:
 
 # Obtains necessary data for departure airport
 depAirport = gdb.lookup(sourceAirport)
-while depAirport is None:
+while depAirport is None or depAirport == '':
     print("Departure airport not found.")
     sourceAirport = input("Please enter valid departure airport code: ")
-    depAirport = gdb.lookup(endAirport)
+    depAirport = gdb.lookup(sourceAirport)
 startLat = depAirport.lat 
 startLong = depAirport.lon
 
 # Obtains necessary data for arrival airport
 arrAirport = gdb.lookup(endAirport)
-while arrAirport is None:
+while arrAirport is None or arrAirport == '':
     print("Arrival airport not found.")
     endAirport = input("Please enter valid arrival airport code: ")
     arrAirport = gdb.lookup(endAirport)
 endLat = arrAirport.lat
 endLong = arrAirport.lon
-
-# Calculates points necessary based on contact with server every 30 seconds
-numberPoints = flightTime // 30 # Will contain data point every 30 sec
 
 # Creates numpy arrays depicting flight path with lat and long point pairs
 latPath = np.linspace(startLat, endLat, numberPoints)
@@ -89,6 +89,9 @@ print("Flight plan sent.")
 
 i = 0
 
+latPosition = None
+lonPosition = None
+
 for i in range(len(latPath)):
 
     try:   
@@ -104,30 +107,32 @@ for i in range(len(latPath)):
         print("Timeout... Cannot find host server.")
         sys.exit(0)
     
-    route = 2
-    clientSocket.sendall(str(route).encode('ascii'))
-    ready = clientSocket.recv(4096)
+    msgType = newPositionUpdate
+    clientSocket.sendall(str(msgType).encode('ascii'))
+    try:
+        ready = clientSocket.recv(4096)
+    except ConnectionResetError as err:
+        print("Lost connection to server. Closing client.")
+        sys.exit(0)
     print("Sending position update...")
-    
-    outboundData = [str(i), str(flightCode)]
-    
-    for i in range(2):
         
-        clientSocket.sendall(outboundData[i].encode('ascii'))
-        clientSocket.recv(4096).decode('ascii')
+    clientSocket.sendall(str(i).encode('ascii'))
+    clientSocket.recv(4096).decode('ascii')
+    
+    clientSocket.sendall(str(flightCode).encode('ascii'))
+    clientSocket.recv(4096).decode('ascii')
         
     print("Sent updated data.")      
     
     latPosition = latPath[i]
-    
-    if latPosition == latPath[-1]:
-        finalMsg = "Flight complete. CLosing client socket."
-        print(finalMsg)
-        clientSocket.close()
+    lonPosition = longPath[i]
 
-    time.sleep(3)
+    time.sleep(10)
 
-    
+if latPosition == latPath[-1] and lonPosition == longPath[-1]:
+    finalMsg = "Flight complete. Closing client socket."
+    print(finalMsg)
+
             
 
 
