@@ -57,10 +57,12 @@ class FlightServer():
                 
                 if flightData[1] == 'DIE':
                     print("Received server kill code from client. Shutting server and client down.")
+                    clientSocket.close()
                     dead = True
                 elif flightData[1] == 'EMT':
                     print("Clearing active flight database. Shutting server and client down.")
                     ActiveFlightDatabase.clearDict()
+                    clientSocket.close()
                     dead = True
                 else:
                     print("Received flight data for flight #%s" % flightCode)
@@ -89,13 +91,13 @@ class FlightServer():
                 
                 elif position[2] == "END":
                     
-                    print("Flight #{} is at [lat, lon]: {}, {}.".format(receivedCode, position[0], position[1]))
+                    print("Flight #{} is at [lat, lon]: {:.4f}, {:4f}.".format(receivedCode, position[0], position[1]))
                     print("Flight #%d has arrived. Closing client." % receivedCode)
                     clientSocket.close()
                 
                 else:
 
-                    print("Flight #{} is at [lat, lon]: {}, {}.".format(receivedCode, position[0], position[1]))
+                    print("Flight #{} is at [lat, lon]: {:.4f}, {:.4f}.".format(receivedCode, position[0], position[1]))
                     clientSocket.close()
                     
             else:
@@ -105,6 +107,8 @@ class FlightServer():
         clientSocket.close()
         listenSocket.close()
         print('Shutting echo server down')
+
+    ######################################
 
 if len(sys.argv) == 3:
     serverPort = int(sys.argv[2])
